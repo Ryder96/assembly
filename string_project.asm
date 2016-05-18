@@ -9,29 +9,58 @@ string: .space 150
 error_message: .asciiz "Some error"
 main_bytes: .byte 'm', 't' , 'l', 'v' #soMma, soTtrazione, moLtiplicazione, diVisione
 jump_next: .word 6, 12, 16, 10
-stack: .space 85
+stack: .word 10000
 
 .text
 
 main:
+    la $s0,stack
+    sw $t1, ($s0)
+    addi $s0,$s0,4
     addi $sp,$sp,-8
     sw $ra, 8($sp)
     jal readString
     move $a0,$zero
     jal getThirdChar
-    sw $a0,0($sp)
+    sb $v0,0($sp)
     move $a0,$v0
     jal recognizeOperation
     move $a0,$v0
     jal nextNumber
-    move $t0,$v0
-    addi $t0,$t0,4
-    lw $t1, 0($sp)
-    sw $t1,0($t0)
+    lb $t1, 0($sp)
+    sb $t1,($s0)
+    addi $s1,$s1,1
+
+    li $t0,0
+    la $s0,stack
+while_print_array:
+    beq $t0,$s1,end
+    li $v0,1
+    lw $a0, ($s0)
+    syscall
+    li $v0,11
+    li $a0, 44
+    syscall
+    addi $s0,$s0,4
+    addi $t0,$t0,1
+    j while_print_array
+end:
+    addi $s0,$s0,-4
+    lb $t1, ($s0)
+    addi $s0,$s0,-4
+    lw $a0, ($s0)
+    addi $s0,$s0,-4
+    lw $a1, ($s0)
+    la $t2, main_bytes
+    lb $t3, 0($t2)
+    beq $t1, $t3, somma
     li $v0, 10
     syscall
-    lw $ra,8($sp)
-    jr $ra
+
+
+
+    li $v0, 10
+    syscall
 
 readString:
     addi $sp,$sp,-4
@@ -132,25 +161,26 @@ convert:
     jal resetRegisters
     lw $ra,0($sp)
     addi $sp,$sp,4
-    la $s0, string
-    add $s0,$s0,$a0
-    li $t0, 10
-    add $t2,$t2,$a0
-    addi $t2,$t2,1
+    la $t0, string
+    add $t0,$t0,$a0
+    li $t1, 10
+    li $t4,0
+    add $t3,$t3,$a0
+    addi $t3,$t3,1
 while:
-    lb $t1, 0($s0)
-    addi $t1,-48
+    lb $t2, 0($t0)
+    addi $t2,-48
     #beq $t1,-4,end_first
-    bgt $t1,9, done
-    blt $t1,0, done
-    mul $s1,$s1,$t0
-    add $s1,$s1,$t1
-    addi $s0,$s0,1
-    addi $t2,$t2,1
+    bgt $t2,9, done
+    blt $t2,0, done
+    mul $t4,$t4,$t1
+    add $t4,$t4,$t2
+    addi $t0,$t0,1
+    addi $t3,$t3,1
     j while
 done:
-    move $v0,$s1
-    move $v1,$t2
+    move $v0,$t4
+    move $v1,$t3
     jr $ra
 end_first:
     jr $ra
@@ -174,27 +204,32 @@ verifyNumber:
 #Next number is a function that
 #It receive as Argument in $a0
 nextNumber:
+    la $s0,stack
+    li $s1,0
     addi $sp,$sp,-8
     sw $ra, 0($sp)
     jal resetRegisters
     #jal verifyNumber
     jal convert
-    la $t0,stack
-    sw $v0,0($t0)
-    addi $t0,$t0,4
+    sw $v0,($s0)
+    addi $s0,$s0,4
+    addi $s1,$s1,1
     sw $v1,4($sp)
-    sw $t0,8($sp)
+    #sw $t0,8($sp)
     move $a0,$v0
     jal printNumber
-    jal convert
-    sw $v0,0($t0)
-    lw $t0,8($sp)
-    add $t0,$t0,4
     move $a0,$v1
+    jal convert
+    #lw $t0,8($sp)
+    move $t0,$v0
+    sw $t0,($s0)
+    addi $s0,$s0,4
+    addi $s1,$s1,1
+    move $a0,$v0
     jal printNumber
     lw $ra, 0($sp)
     addi $sp,$sp,8
-    move $v0,$t0
+    #move $v0,$t0
     jr $ra
 
 printChar:
@@ -233,4 +268,55 @@ resetRegisters:
     move $t4,$zero
     move $t5,$zero
     move $t6,$zero
+    jr $ra
+
+
+somma:
+    addi $sp,$sp,-4
+    sw $ra, 0($sp)
+    add $t0, $a0, $a1
+    move $v0,$t0
+    move $a0,$t0
+    jal printNumber
+    lw $ra,0($sp)
+    addi $sp,$sp,4
+    jr $ra
+
+sottrazione:
+    lw $t1, 0($sp)				#pop primo operando
+    lw $t2, 4($sp)				#pop secondo operando
+    sub $t3, $t1, $t2
+    move $v0, $t3
+    addi $sp, $sp,-4
+    sw $t3, 0($sp)				#push risultato
+    addi $sp, $sp,-1
+    la $t4, sot 				#sot è la stringa "s" che identifica una sottrazione
+    sb $t4, 0($sp)
+    jr $ra
+
+moltiplicazione:
+    lw $t1, 0($sp)				#pop primo operando
+    lw $t2, 4($sp)				#pop secondo operando
+    mult $t1, $t2
+    mflo $t3                    #mette in t3 il risultato della moltiplicazione contenuto nel registro H1
+    addi $sp, $sp,-4
+    move $v0, $t3
+    sw $t3, 0($sp)				#push risultato
+    addi $sp, $sp,-1
+    la $t4, multi 				#mul è la stringa "s" che identifica una moltiplicazione
+    sb $t4, 0($sp)
+    jr $ra
+
+
+divisione:
+    lw $t1, 0($sp)				#pop primo operando
+    lw $t2, 4($sp)				#pop secondo operando
+    div $t1, $t2
+    mflo $t3                    #mette in t3 il risultato della divisione contenuto nel registro Lo
+    addi $sp, $sp,-4
+    sw $t3, 0($sp)              #push risultato
+    move $v0, $t3
+    addi $sp, $sp,-1
+    la $t4, division			#div è la stringa "s" che identifica una divisione
+    sb $t4, 0($sp)#
     jr $ra
