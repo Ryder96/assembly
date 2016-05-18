@@ -4,11 +4,12 @@
 # Called operazione.txt
 
 .data
-file: .asciiz "/run/media/andres/Dati/Work/Uni/Assembly/Stringhe/operazione.txt"
+file: .asciiz "D:\Work\Uni\Assembly\Stringhe\operazione.txt"
 string: .space 150
 error_message: .asciiz "Some error"
 main_bytes: .byte 'm', 't' , 'l', 'v' #soMma, soTtrazione, moLtiplicazione, diVisione
 jump_next: .word 6, 12, 16, 10
+stack: .space 85
 
 .text
 
@@ -18,13 +19,17 @@ main:
     jal readString
     move $a0,$zero
     jal getThirdChar
+    sw $a0,0($sp)
     move $a0,$v0
     jal recognizeOperation
-    sw $v1,0($sp)
     move $a0,$v0
     jal nextNumber
-    #li $v0, 10
-    #syscall
+    move $t0,$v0
+    addi $t0,$t0,4
+    lw $t1, 0($sp)
+    sw $t1,0($t0)
+    li $v0, 10
+    syscall
     lw $ra,8($sp)
     jr $ra
 
@@ -46,7 +51,6 @@ open:
     li $a1, 0           #open to read file, 0 is for reading
     li $a2, 1           #writing mode is ignored, 1 is for writing
     syscall             #open a file(the file descriptor is returned in v0)
-
     blt $v0, 0, error   #error
     jr $ra
 
@@ -70,7 +74,7 @@ read:
 
 close:
     li $v0, 16        # Close File Syscall
-    #move  a0, $t6   # Load File Descriptor
+    move $a0, $zero   # Load File Descriptor
     syscall
     jr $ra
 
@@ -92,7 +96,6 @@ recognizeOperation:
     la $t2, jump_next
     lb $t3, 0($t1)
     lw $t4, 0($t2)
-    li $v0,0
     beq $t0, $t3, sum
     lb $t3, 1($t1)
     lw $t4, 4($t2)
@@ -155,39 +158,43 @@ end_first:
 verifyNumber:
     addi $sp,$sp,-4
     sw $ra,0($sp)
-    jal resetRegisters
+    jal resetRegisters	  # called the function that reset the registers
+    la $t0, string			  # $t0 has the address of the first character of the string read before
+    move $t1, $a0			    # $t1 has the position of the string to read later
+    add $t0,$t0,$t1			  # $t0 now point to the position of the $t1 character
+    lb $t1,0($t0)			    # $t1 has the character pointed by $t0
+    move $a0,$t1
+    jal printChar
     lw $ra,0($sp)
     addi $sp,$sp,4
-    
-
-resetRegisters:
-    move $v0,$zero
-    move $v1,$zero
-    move $t0,$zero
-    move $t1,$zero
-    move $t2,$zero
-    move $t3,$zero
-    move $t4,$zero
-    move $t5,$zero
-    move $t6,$zero
     jr $ra
 
-#Next number is a function that 
-#It receive as Argument in $a0 
+
+
+#Next number is a function that
+#It receive as Argument in $a0
 nextNumber:
-    addi $sp,$sp,-4
+    addi $sp,$sp,-8
     sw $ra, 0($sp)
     jal resetRegisters
-    jal verifyNumber
+    #jal verifyNumber
     jal convert
+    la $t0,stack
+    sw $v0,0($t0)
+    addi $t0,$t0,4
     sw $v1,4($sp)
+    sw $t0,8($sp)
     move $a0,$v0
     jal printNumber
     jal convert
+    sw $v0,0($t0)
+    lw $t0,8($sp)
+    add $t0,$t0,4
     move $a0,$v1
     jal printNumber
     lw $ra, 0($sp)
-    addi $sp,$sp,4
+    addi $sp,$sp,8
+    move $v0,$t0
     jr $ra
 
 printChar:
@@ -214,4 +221,16 @@ error:
     li  $v0, 4  # Print String Syscall
     la $a0, error_message  # Load Error String
     syscall
+    jr $ra
+
+resetRegisters:
+    move $v0,$zero
+    move $v1,$zero
+    move $t0,$zero
+    move $t1,$zero
+    move $t2,$zero
+    move $t3,$zero
+    move $t4,$zero
+    move $t5,$zero
+    move $t6,$zero
     jr $ra
