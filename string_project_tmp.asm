@@ -197,9 +197,8 @@ end_first:
     jr $ra
 
 verifyNumber:
-    addi $sp,$sp,-12
+    addi $sp,$sp,-8
     sw $ra,0($sp)
-    sw $a0,4($sp)
     jal resetRegisters	  # called the function that reset the registers
     la $t0, string			  # $t0 has the address of the first character of the string read before
     la $t1, main_bytes    # $t1 points to the main_bytes head
@@ -207,36 +206,34 @@ verifyNumber:
     move $t2, $a0			    # $t2 has the position of the string to read later
     add $t0,$t0,$t2			  # $t0 now point to the position of the $t1 character
     lb $t3,0($t0)			    # $t1 has the character pointed by $t0
-    move $a0,$t3
-    jal printChar
     addi $t3,$t3,-48
     bgt $t3,9, go_to_operations
     blt $t3,0, go_to_operations
 done_verify:
     lw $ra,0($sp)
-    addi $sp,$sp,8
+    addi $sp,$sp,4
     move $v0,$t3
     jr $ra
 go_to_operations:
     move $a0,$t2
     jal getThirdChar
-    sb $v0,8($sp)
-    sw $t3,12($sp)
+    sw $v0,4($sp)
     move $a0,$v0
     jal recognizeOperation
-    lw $a0,4($sp)
-    add $a0,$a0,$v0
+    move $a0,$v0
     jal nextNumber
-    lb $t1,8($sp)
-    sb $t1,0($s0)
-    addi $s1,$s1,1
-    lw $t3,12($sp)
-    lw $ra,0($sp)
-    addi $sp,$sp,12
-    addi $a0,$a0,1
-    move $v0,$t3
-    jr $ra
-
+    lb $t4,0($t1)
+    lw $t6,0($t5)
+    beq $t3,$t2,go_to_sum
+    lb $t4,1($t1)
+    lb $t6,4($t1)
+    beq $t3,$t2,go_to_sub
+    lb $t3, 2($t1)
+    lw $t4, 8($t2)
+    beq $t3,$t2,go_to_mul
+    lb $t3, 3($t1)
+    lw $t4, 12($t2)
+    beq $t3,$t2,go_to_div
 
 go_to_sum:
 
@@ -258,7 +255,7 @@ nextNumber:
     sw $v1,4($sp)
     #sw $t0,8($sp)
     move $a0,$v0
-    jal verifyNumber
+    move $a0,$v1
     jal convert
     #lw $t0,8($sp)
     move $t0,$v0
