@@ -8,6 +8,7 @@ file: .asciiz "D:\Work\Uni\Assembly\Stringhe\operazione.txt"
 string: .space 150
 error_message: .asciiz "Some error"
 main_bytes: .byte 'm', 't' , 'l', 'v' #soMma, soTtrazione, moLtiplicazione, diVisione
+brackets: .byte '(' , ')' , ','
 jump_next: .word 6, 12, 16, 10
 stack: .word 10000
 sum_string: .ascii "somma: "
@@ -22,15 +23,9 @@ main:
     li $s1,0
     sw $t1, ($s0)
     addi $s0,$s0,4
-    addi $sp,$sp,-8
-    sw $ra, 8($sp)
+    addi $sp,$sp,-4
+    sw $ra, 0($sp)
     jal readString
-    move $a0,$zero
-    jal getThirdChar
-    sb $v0,0($sp)
-    move $a0,$v0
-    jal recognizeOperation
-    move $a0,$v0
     jal nextNumber
     lb $t1, 0($sp)
     sb $t1,($s0)
@@ -46,11 +41,6 @@ main:
     la $t2, main_bytes
     lb $t3, 0($t2)
     beq $t1, $t3, somma
-    li $v0, 10
-    syscall
-
-
-
     li $v0, 10
     syscall
 
@@ -164,23 +154,19 @@ division:
     j exit_ro
 exit_ro:
     jr $ra
-
-
+#Return in $V0 the value of the integer, in $v1 the position for next controll jumping brackets and commas
 convert:
     addi $sp,$sp,-4
     sw $ra,0($sp)
     jal resetRegisters
-    lw $ra,0($sp)
-    addi $sp,$sp,4
     la $t0, string
     add $t0,$t0,$a0
     li $t1, 10
     li $t4,0
     add $t3,$t3,$a0
-    addi $t3,$t3,1
 while:
     lb $t2, 0($t0)
-    addi $t2,-48
+    addi $t2,$2,-48
     #beq $t1,-4,end_first
     bgt $t2,9, done
     blt $t2,0, done
@@ -190,84 +176,109 @@ while:
     addi $t3,$t3,1
     j while
 done:
+    sw $t4,4($sp)
+    addi $t3,$t3,1
+    move $a0,$t3
+    jal increase_index
+    lw $t4,4($sp)
+    move $v1,$v0
     move $v0,$t4
-    move $v1,$t3
+    lw $ra,0($sp)
+    addi $sp,$sp,4
     jr $ra
-end_first:
-    jr $ra
-
+#Returns in $V0 the integer converted if is not an operation else it returns the operation decodified in number
+#Returns in $V1 the position for the next controll
 verifyNumber:
-    addi $sp,$sp,-12
+    addi $sp,$sp,-8
     sw $ra,0($sp)
-    sw $a0,4($sp)
-    jal resetRegisters	  # called the function that reset the registers
+    move $t9,$ra
+    #jal resetRegisters	  # called the function that reset the registers
     la $t0, string			  # $t0 has the address of the first character of the string read before
     la $t1, main_bytes    # $t1 points to the main_bytes head
     la $t5, jump_next     # $t5 points to the jump_next array head
     move $t2, $a0			    # $t2 has the position of the string to read later
     add $t0,$t0,$t2			  # $t0 now point to the position of the $t1 character
     lb $t3,0($t0)			    # $t1 has the character pointed by $t0
-    move $a0,$t3
-    jal printChar
+    move $a0,$t2
+    jal printNumber
     addi $t3,$t3,-48
     bgt $t3,9, go_to_operations
     blt $t3,0, go_to_operations
-done_verify:
+    move $a0,$t2
+convert_exit:
+    jal convert
+    move $t3,$v0
+    move $t4,$v1
     lw $ra,0($sp)
     addi $sp,$sp,8
     move $v0,$t3
+    move $v1,$t4
+    move $ra,$t9
     jr $ra
 go_to_operations:
     move $a0,$t2
     jal getThirdChar
-    sb $v0,8($sp)
-    sw $t3,12($sp)
+    sw $v0,0($s0)
+    addi $s0,$s0,4
+    addi $s1,$s1,1
     move $a0,$v0
     jal recognizeOperation
-    lw $a0,4($sp)
-    add $a0,$a0,$v0
-    jal nextNumber
-    lb $t1,8($sp)
-    sb $t1,0($s0)
-    addi $s1,$s1,1
-    lw $t3,12($sp)
+    move $a0,$v0
+    j convert_exit
+
+
+increase_index:
+    addi $sp,$sp,-4
+    sw $ra,0($sp)
+    jal resetRegisters
+    move $t0,$a0
+    la $t1,brackets
+    la $t2,string
+    lb $t3,1($t1)
+    add $t2,$t2,$t0
+    lb $t4,0($t2)
+    lb $t5,2($t1)
+increasing:
+    beq $t3, $t4, increase
+    beq $t5, $t4, increase
     lw $ra,0($sp)
-    addi $sp,$sp,12
-    addi $a0,$a0,1
-    move $v0,$t3
+    addi $sp,$sp,4
+    move $v0,$t0
     jr $ra
-
-
-go_to_sum:
-
-    jr $ra
-
+increase:
+    addi $t0,$t0,1
+    add $t2,$t2,$t0
+    lb $t4,0($t2)
+    j increasing
 
 
 #Next number is a function that
 #It receive as Argument in $a0
 nextNumber:
-    addi $sp,$sp,-8
+    addi $sp,$sp,-12
     sw $ra, 0($sp)
     jal resetRegisters
+    la $t0,string
+    li $t1,0
+    lb $t2,0($t0)
+    la $t3,brackets
+    lb $t4,1($t3)
+while_not_end_string:
+    beq $t2,$t4,terminate
+    move $a0,$t1
     jal verifyNumber
-    jal convert
-    sw $v0,($s0)
+    sw $v0,0($s0)
     addi $s0,$s0,4
     addi $s1,$s1,1
-    sw $v1,4($sp)
-    #sw $t0,8($sp)
-    move $a0,$v0
-    jal verifyNumber
-    jal convert
-    #lw $t0,8($sp)
-    move $t0,$v0
-    sw $t0,($s0)
-    addi $s0,$s0,4
-    addi $s1,$s1,1
-    lw $ra, 0($sp)
-    addi $sp,$sp,8
-    #move $v0,$t0
+    move $t1,$v1
+    la $t0,string
+    add $t0,$t0,$t1
+    addi $t0,$t0,-1
+    lb $t2,0($t0)
+    la $t3,brackets
+    lb $t4,1($t3)
+    j while_not_end_string
+terminate:
     jr $ra
 
 printChar:
@@ -277,6 +288,7 @@ printChar:
     jr $ra
 
 printNumber:
+    addi $a0,$a0,-48
     li $v0,1
     syscall
     jr $ra
